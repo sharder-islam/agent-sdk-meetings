@@ -1,0 +1,11 @@
+services:
+  meeting-agent:
+    build: .
+    env_file: .env
+    ports:
+      - "3978:3978"
+    volumes:
+      - ./output:/app/output
+      - ./logs:/app/logs
+    environment:
+      - PORT=3978
