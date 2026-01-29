@@ -34,24 +34,36 @@ This solution requires four Azure resources. Create them in the order below and 
 ## 2. Azure Bot Service
 
 1. In Azure Portal, create a resource: **Azure Bot** (Bot Services).
-2. Choose **Multi Tenant** or **Single Tenant** as needed; use the same Microsoft App ID (from the App Registration above).
+2. Under **Microsoft App ID**, choose **Use existing app registration** and select (or enter) the **Application (client) ID** from the App Registration you created above. Choose **Single tenant** (recommended) or Multi-tenant as needed.
 3. Create the bot; then open the resource.
 4. Go to **Configuration** and set:
-   - **Messaging endpoint:** `https://<your-webapp>.azurewebsites.net/api/messages` (replace with your Web App URL).
-   - **Microsoft App ID:** the Application (client) ID from the App Registration.
-   - **Microsoft App Password:** the client secret from the App Registration.
+   - **Messaging endpoint:** `https://<your-webapp>.azurewebsites.net/api/messages` (replace with your Web App URL). You can set this after the Web App exists.
+   - **Microsoft App ID:** should already be set from step 2. There is **no field in the portal to paste the Microsoft App Password**—Azure Bot Service does not store or display the password.
 5. Under **Channels**, add **Microsoft Teams** (and **Direct Line** if used for Copilot).
 
-**Output:** Bot is configured; no extra env vars beyond App Registration.
+**Where does the app password go?** The password (client secret) is **not** entered in the Azure Bot resource. You create it in the **App Registration** (Certificates & secrets). You then put that same value in **your Web App’s** Application settings as `MicrosoftAppPassword`. Your bot code uses it to validate incoming requests and to call the channel API. So: **App Registration** = create the secret; **Web App** = store `MicrosoftAppId` and `MicrosoftAppPassword` in config.
 
-## 3. Web App (App Service)
+**To create or rotate the secret:** In the Bot resource, go to **Configuration** and click **Manage** next to **Microsoft App ID**. That opens the App Registration’s **Certificates & secrets** blade. Create a new client secret there, copy the value once, and add it to your Web App’s Application settings as `MicrosoftAppPassword`.
 
-1. Create **App Service** (Web App); choose **Linux** and a runtime (e.g. **Docker** or **Python**).
-2. If using Docker: in **Deployment Center**, point to your Azure Container Registry (ACR) and the image for this agent (see [docker.md](docker.md)).
-3. In **Configuration** > **Application settings**, add all required environment variables (see [configuration.md](configuration.md)).
-4. Ensure **HTTPS Only** is on and the bot’s messaging endpoint uses `https://`.
+**Output:** Bot is configured. Your Web App must have `MicrosoftAppId` and `MicrosoftAppPassword` (and `TENANT_ID`, etc.) in its configuration.
 
-**Output:** Web App URL, e.g. `https://<webapp>.azurewebsites.net`. Use `/api/messages` as the bot messaging endpoint.
+## 3. Web App (App Service): Web App vs Web App for Containers
+
+**Which one to create?**
+
+- **Web App for Containers** (or **App Service** with **Docker** as the publish option): Use this when you deploy the agent as a **Docker image** (e.g. from Azure Container Registry). This matches this project’s Dockerfile. Create the resource, then in **Deployment Center** set **Container** as the source and point to your ACR (or other registry) and the image (see [docker.md](docker.md)).
+- **Web App** (code deployment): Use this when you deploy **source code** and let Azure run it with a runtime (e.g. **Python**). No container; you publish code (e.g. via GitHub Actions or ZIP deploy). Choose **Linux** and **Python** as the runtime, then deploy your repo or package.
+
+**Recommendation for this project:** Because the repo includes a **Dockerfile** and is set up for containerized runs, **Web App for Containers** (App Service with Docker/container) is the natural choice if you want to run the same image locally and in Azure. If you prefer not to manage containers, create a regular **Web App** with **Python** and deploy the code; you will need to ensure the startup command runs `python -m meeting_agent` and that all dependencies are installed (e.g. via `requirements.txt` or the build step).
+
+**Steps (either type):**
+
+1. Create **App Service** (Web App). For containers: choose **Docker** as the publish option and **Linux**. For code: choose **Code**, **Python**, and **Linux**.
+2. If using Docker: in **Deployment Center**, set **Container** and point to ACR (or other registry) and the image for this agent (see [docker.md](docker.md)). Set **WEBSITES_PORT** to the port your app listens on (e.g. `3978`).
+3. In **Configuration** > **Application settings**, add all required environment variables (see [configuration.md](configuration.md)), including **MicrosoftAppId** and **MicrosoftAppPassword** (the client secret from the App Registration).
+4. Ensure **HTTPS Only** is on so the bot’s messaging endpoint uses `https://`.
+
+**Output:** Web App URL, e.g. `https://<webapp>.azurewebsites.net`. Use `/api/messages` as the bot messaging endpoint in the Azure Bot resource.
 
 ## 4. Azure OpenAI
 
